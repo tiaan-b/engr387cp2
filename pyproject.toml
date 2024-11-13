@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "engr387cp2"
+version = "0.1.0"
+description = "ENGR 387 Course Project 2"
+authors = ["Tiaan <89718829+tiaan-b@users.noreply.github.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
