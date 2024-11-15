@@ -1,3 +1,5 @@
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 from typing import Iterable, Callable
 
@@ -7,9 +9,15 @@ class LODECCI_IVP_Model:
             coeffs: Iterable[float],
             dt: float,
             f: Callable[[np.float64], np.float64] | None = None,
-            ic: Iterable[float] | float = 0.0,
+            ic: Iterable[float] | float = 1.0,
             t0: float = 0.0,
+            fLatex: str | None = None
             ):
+        
+        if len(coeffs) == 0:
+            raise ValueError("Must specify at least one coefficient")
+        if coeffs[-1] == 0:
+            raise ValueError("The last element in coeffs must be nonzero")
         
         # TODO: check lengths of n
         self._coeffs = np.array(coeffs, dtype = np.float64)
@@ -21,6 +29,9 @@ class LODECCI_IVP_Model:
             dtype = np.float64
         )
         self._t0 = np.float64(t0)
+        self._fLatex = (
+            fLatex if fLatex is not None else "0" if f is None else "f(t)"
+        )
         
         if not len(self._ic) == self._n:
             raise ValueError(f"Must specify {self._n} initial conditions.")
@@ -40,6 +51,27 @@ class LODECCI_IVP_Model:
             xip1[-1] = xip1[-1] + self._dt * fi / self._coeffs[-1]
             return xip1
         self._step = step
+        
+    @property
+    def eom(self):
+        eq = ""
+        for i in range(len(self._coeffs)):
+            coeff = self._coeffs[i]
+            if coeff > 0:
+                sign = "+"
+            elif coeff < 0:
+                sign = "-"
+            else:
+                continue
+            
+            eq = sign + f"{abs(float(coeff))}x^{{({i})}}(t)" + eq
+            
+        if eq[0] == "+":
+            eq = eq[1:]
+        eq = eq.replace("^{(0)}", "")
+        eq = "$" + eq + "=" + self._fLatex + "$"
+        return eq
+        
         
     def eval(
             self,
@@ -80,3 +112,69 @@ class LODECCI_IVP_Model:
         ):
         
         return self.eval(t, tStart = t)
+    
+    def quickPlot(
+            self, 
+            *args, 
+            ax: matplotlib.axes._axes.Axes | None = None,
+            showPlot: bool = True,
+            **kwargs,
+            ) -> matplotlib.axes._axes.Axes:
+            
+        x, t = self.eval(*args, **kwargs)
+            
+        if ax is None:
+            _, ax = plt.subplots()
+                
+        n = 1 if not len(x.shape) > 1 else x.shape[1]
+        labels = [f"$x^{{({i})}}(t)$" for i in range(n)]
+        labels[0] = "$x(t)$"
+                
+        ax.plot(t, x, label=labels)
+        ax.set_title(self.eom)
+        ax.set_xlabel("$t$")
+        ax.legend()
+            
+        if showPlot:
+            plt.show()
+                
+        return ax
+    
+    
+class MSDp_SinusoidalForcing_IVP_Model(LODECCI_IVP_Model):
+    # For systems of the form: m*x''(t) + c*x'(t) + k*x(t) = F*cos(omega*t)
+    # Values specified for f and fLatex are ignored
+    def __init__(
+            self,
+            m: float,
+            c: float,
+            k: float,
+            F: float,
+            omega: float,
+            dt: float,
+            **kwargs
+            ):
+        
+        omega = np.float64(omega)
+        kwargs["f"] = lambda t: F * np.cos(omega * t)
+        kwargs["fLatex"] = f"{F}\cos{{({omega}t)}}"
+        super().__init__(
+            [k,c,m],
+            dt,
+            **kwargs
+        )
+            
+        self._m = np.float64(m)
+        self._c = np.float64(c)
+        self._k = np.float64(k)
+        self._F = np.float64(F)
+        self._omega = omega
+        
+    def getHomogenousModel(self) -> LODECCI_IVP_Model:
+        return LODECCI_IVP_Model(
+            [k,c,m],
+            dt,
+            f = None,
+            ic = self._ic,
+            t0 = self._t0
+        )
