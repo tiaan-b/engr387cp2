@@ -131,7 +131,7 @@ class LODECCI_IVP_Model:
         labels[0] = "$x(t)$"
                 
         ax.plot(t, x, label=labels)
-        ax.set_title(self.eom)
+        ax.set_title(self.eom + f", $\Delta t = {self._dt}$")
         ax.set_xlabel("$t$")
         ax.legend()
             
@@ -172,8 +172,8 @@ class MSDp_SinusoidalForcing_IVP_Model(LODECCI_IVP_Model):
         
     def getHomogenousModel(self) -> LODECCI_IVP_Model:
         return LODECCI_IVP_Model(
-            [k,c,m],
-            dt,
+            [self._k,self._c,self._m],
+            self._dt,
             f = None,
             ic = self._ic,
             t0 = self._t0
