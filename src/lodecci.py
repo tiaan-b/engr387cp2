@@ -79,7 +79,7 @@ class LODECCI_IVP_Model:
             tStart: float | None = None,
             includeEndpoints: tuple[bool, bool] = (True, True),
             zerothOrderOnly: bool = True
-        ):
+        ) -> tuple[np.ndarray, np.ndarray]:
         
         tStart = self._t0 if tStart is None else np.float64(tStart)
         tStop = np.float64(tStop)
@@ -109,7 +109,7 @@ class LODECCI_IVP_Model:
     def evalAt(
             self,
             t: float
-        ):
+        ) -> tuple[np.ndarray, np.ndarray]:
         
         return self.eval(t, tStart = t)
     
@@ -119,7 +119,7 @@ class LODECCI_IVP_Model:
             ax: matplotlib.axes._axes.Axes | None = None,
             showPlot: bool = True,
             **kwargs,
-            ) -> matplotlib.axes._axes.Axes:
+            ) -> tuple[np.ndarray, np.ndarray, matplotlib.axes._axes.Axes]:
             
         x, t = self.eval(*args, **kwargs)
             
@@ -138,7 +138,7 @@ class LODECCI_IVP_Model:
         if showPlot:
             plt.show()
                 
-        return ax
+        return x, t, ax
     
     
 class MSDp_SinusoidalForcing_IVP_Model(LODECCI_IVP_Model):
