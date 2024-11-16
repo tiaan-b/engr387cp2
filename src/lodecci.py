@@ -8,10 +8,11 @@ class LODECCI_IVP_Model:
             self,
             coeffs: Iterable[float],
             dt: float,
-            f: Callable[[np.float64], np.float64] | None = None,
+            f: Callable[[np.float64],np.float64] | None = None,
             ic: Iterable[float] | float = 1.0,
             t0: float = 0.0,
-            fLatex: str | None = None
+            fLatex: str | None = None,
+            analyticalSolution: Callable[[np.ndarray],np.ndarray] | None = None
             ):
         
         if len(coeffs) == 0:
@@ -19,7 +20,9 @@ class LODECCI_IVP_Model:
         if coeffs[-1] == 0:
             raise ValueError("The last element in coeffs must be nonzero")
         
-        # TODO: check lengths of n
+        def anaSolPlaceholder():
+            raise NotImplementedError("Analytical solution is not specified.")
+        
         self._coeffs = np.array(coeffs, dtype = np.float64)
         self._n = len(self._coeffs) - 1
         self._f = f if f is not None else lambda t: np.float64(0.0)
@@ -30,7 +33,13 @@ class LODECCI_IVP_Model:
         )
         self._t0 = np.float64(t0)
         self._fLatex = (
-            fLatex if fLatex is not None else "0" if f is None else "f(t)"
+            fLatex if fLatex is not None 
+            else "0" if f is None 
+            else "f(t)"
+        )
+        self.analyticalSolution = (
+            anaSolPlaceholder if analyticalSolution is None
+            else analyticalSolution
         )
         
         if not len(self._ic) == self._n:
@@ -71,7 +80,6 @@ class LODECCI_IVP_Model:
         eq = eq.replace("^{(0)}", "")
         eq = "$" + eq + "=" + self._fLatex + "$"
         return eq
-        
         
     def eval(
             self,
@@ -118,6 +126,7 @@ class LODECCI_IVP_Model:
             *args, 
             ax: matplotlib.axes._axes.Axes | None = None,
             showPlot: bool = True,
+            plotAnalyticalSolution: bool = False,
             **kwargs,
             ) -> tuple[np.ndarray, np.ndarray, matplotlib.axes._axes.Axes]:
             
@@ -130,7 +139,13 @@ class LODECCI_IVP_Model:
         labels = [f"$x^{{({i})}}(t)$" for i in range(n)]
         labels[0] = "$x(t)$"
                 
-        ax.plot(t, x, label=labels)
+        ax.plot(t, x, label = labels)
+        
+        x_analytical = None
+        if plotAnalyticalSolution:
+            x_analytical = self.analyticalSolution(t)
+            ax.plot(t, x_analytical, label = "Analytical Solution $x_{a}(t)$")
+        
         ax.set_title(self.eom + f", $\Delta t = {self._dt}$")
         ax.set_xlabel("$t$")
         ax.legend()
@@ -138,7 +153,7 @@ class LODECCI_IVP_Model:
         if showPlot:
             plt.show()
                 
-        return x, t, ax
+        return x, t, ax, x_analytical
     
     
 class MSDp_SinusoidalForcing_IVP_Model(LODECCI_IVP_Model):

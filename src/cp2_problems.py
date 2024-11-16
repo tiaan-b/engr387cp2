@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 from src import lodecci
 
@@ -6,8 +7,8 @@ def main():
     plt.close('all')
     
     problems = getProblemSet()
-    for i, problem in enumerate(problems):
-        models, xs, ts, axs = problem(showPlot = False)
+    for i, problem in enumerate(problems[:3]):
+        models, xs, ts, axs, x_analyticals = problem(showPlot = False)
         fig = axs[0].get_figure()
         fig.suptitle(f"Problem {i + 1}")
         fig.set_tight_layout(True)
@@ -32,15 +33,16 @@ def getGenericProblem(tStart, tStop, *args, generalSolutionOnly: bool = True, **
         if generalSolutionOnly:
             model = model.getHomogenousModel()
             
-        x, t, axOut = model.quickPlot(
+        x, t, axOut, x_analytical = model.quickPlot(
             tStop,
             tStart = tStart,
             zerothOrderOnly = True,
             ax = ax,
-            showPlot = showPlot
+            showPlot = showPlot,
+            plotAnalyticalSolution = "analyticalSolution" in kwargs
         )
         
-        return model, x, t, axOut
+        return model, x, t, axOut, x_analytical
     
     return p
 
@@ -70,7 +72,7 @@ def getProblemParams():
                 {
                     "generalSolutionOnly" : False,
                     "t0" : 0.0,
-                    "ic" : [1.0, 1.0]
+                    "ic" : [0.0, 0.0],
                 }
             ]
         ],
@@ -80,7 +82,7 @@ def getProblemParams():
                 {
                     "generalSolutionOnly" : False,
                     "t0" : 0.0,
-                    "ic" : [1.0, 1.0]
+                    "ic" : [0.0, 0.0]
                 }
             ]
         ],
@@ -90,7 +92,7 @@ def getProblemParams():
                 {
                     "generalSolutionOnly" : False,
                     "t0" : 0.0,
-                    "ic" : [1.0, 1.0]
+                    "ic" : [0.0, 0.0]
                 }
             ]
         ],
