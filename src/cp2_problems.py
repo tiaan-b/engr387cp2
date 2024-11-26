@@ -19,42 +19,6 @@ def main():
                 ax.title.set_size(0.8 * ax.title.get_size())
         
     plt.show()
-    
-def analytical_solution_1(m,c,k,F,w,x0,v0,t_end,dt):
-
-    wn = np.sqrt(k/m)
-    z = c / (2 * np.sqrt(k* m))
-
-    t = np.arange(0, t_end,dt)
-
-    if z < 1: 
-        wd = wn * np.sqrt(1- z**2)
-        A = x0
-        B = (v0 + z * wn * x0) / wd
-        # Homogenous Solution
-        x_h = np.exp(np.exp(-z * wn * t) * (A * np.cos(wd * t) + B * np.sin(wd * t)))
-    elif z == 1:
-        A = x0
-        B = v0 + wn * x0
-        # Homogenous Solution
-        x_h = (A + B * t) * np.exp(-wn * t)
-    else:
-        r1 = -z * wn+ wn * np.sqrt(z**2 - 1)
-        r2 = -z * wn - wn * np.sqrt(z**2 - 1)
-        A = (v0 - r2 * x0) / (r1 - r2)
-        B = (r1 * x0 - v0) / (r1 - r2)
-        # Homogenous Solution
-        x_h = A * np.exp(r1 * t) + B * np.exp(r2 * t)
-
-    num = F/m
-    denom = np.sqrt((wn**2 - w**2)**2 + (2 * z * wn * w)**2)
-    # Particular Solution
-    x_p = (num / denom) * np.cos(w * t - np.arctan2(2 * z * wn * w, wn**2 - w**2))
-    
-    # Total solution
-    x = x_h + x_p
-
-    return t,x
 
 def getProblemSet(*args, **kwargs):
     problemParams = getProblemParams(*args, **kwargs)
