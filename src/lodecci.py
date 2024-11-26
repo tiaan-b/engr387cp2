@@ -62,6 +62,18 @@ class LODECCI_IVP_Model:
         self._step = step
         
     @property
+    def coeffs(self) -> np.ndarray:
+        return self._coeffs.copy()
+    
+    @property
+    def ic(self) -> np.ndarray:
+        return self._ic.copy()
+    
+    @property
+    def t0(self) -> np.float64:
+        return self._t0.copy()
+        
+    @property
     def eom(self):
         eq = ""
         for i in range(len(self._coeffs)):
@@ -156,23 +168,24 @@ class LODECCI_IVP_Model:
         return x, t, ax, x_analytical
     
     
-class MSDp_SinusoidalForcing_IVP_Model(LODECCI_IVP_Model):
-    # For systems of the form: m*x''(t) + c*x'(t) + k*x(t) = F*cos(omega*t)
+class MSDp_cosineForcing_IVP_Model(LODECCI_IVP_Model):
+    # For systems of the form: m*x''(t) + c*x'(t) + k*x(t) = F_0*cos(omega*t)
     # Values specified for f and fLatex are ignored
     def __init__(
             self,
             m: float,
             c: float,
             k: float,
-            F: float,
+            F_0: float,
             omega: float,
             dt: float,
             **kwargs
             ):
         
+        kwargs["fLatex"] = f"{F_0}\cos{{({omega}t)}}"
         omega = np.float64(omega)
-        kwargs["f"] = lambda t: F * np.cos(omega * t)
-        kwargs["fLatex"] = f"{F}\cos{{({omega}t)}}"
+        F_0 = np.float64(F_0)
+        kwargs["f"] = lambda t: F_0 * np.cos(omega * t)
         super().__init__(
             [k,c,m],
             dt,
@@ -182,8 +195,16 @@ class MSDp_SinusoidalForcing_IVP_Model(LODECCI_IVP_Model):
         self._m = np.float64(m)
         self._c = np.float64(c)
         self._k = np.float64(k)
-        self._F = np.float64(F)
+        self._F_0 = F_0
         self._omega = omega
+        
+    @property
+    def F_0(self) -> np.float64:
+        return self._F_0.copy()
+    
+    @property
+    def omega(self) -> np.float64:
+        return self._omega.copy()
         
     def getHomogenousModel(self) -> LODECCI_IVP_Model:
         return LODECCI_IVP_Model(

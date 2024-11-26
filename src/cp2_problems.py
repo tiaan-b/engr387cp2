@@ -1,22 +1,63 @@
+from typing import Callable
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from src import lodecci
 
 def main():
-    plt.close('all')
-    
-    problems = getProblemSet()
-    for i, problem in enumerate(problems[:3]):
+    # Answer all the questions in course project 2
+        
+    problems = getProblemSet(constructAnalyticalSolution = True)
+    for i, problem in enumerate(problems):
         models, xs, ts, axs, x_analyticals = problem(showPlot = False)
         fig = axs[0].get_figure()
         fig.suptitle(f"Problem {i + 1}")
-        fig.set_tight_layout(True)
+        
+        if i + 1 == 6:
+            for ax in axs:
+                ax.title.set_size(0.8 * ax.title.get_size())
         
     plt.show()
+    
+def analytical_solution_1(m,c,k,F,w,x0,v0,t_end,dt):
 
-def getProblemSet():
-    problemParams = getProblemParams()
+    wn = np.sqrt(k/m)
+    z = c / (2 * np.sqrt(k* m))
+
+    t = np.arange(0, t_end,dt)
+
+    if z < 1: 
+        wd = wn * np.sqrt(1- z**2)
+        A = x0
+        B = (v0 + z * wn * x0) / wd
+        # Homogenous Solution
+        x_h = np.exp(np.exp(-z * wn * t) * (A * np.cos(wd * t) + B * np.sin(wd * t)))
+    elif z == 1:
+        A = x0
+        B = v0 + wn * x0
+        # Homogenous Solution
+        x_h = (A + B * t) * np.exp(-wn * t)
+    else:
+        r1 = -z * wn+ wn * np.sqrt(z**2 - 1)
+        r2 = -z * wn - wn * np.sqrt(z**2 - 1)
+        A = (v0 - r2 * x0) / (r1 - r2)
+        B = (r1 * x0 - v0) / (r1 - r2)
+        # Homogenous Solution
+        x_h = A * np.exp(r1 * t) + B * np.exp(r2 * t)
+
+    num = F/m
+    denom = np.sqrt((wn**2 - w**2)**2 + (2 * z * wn * w)**2)
+    # Particular Solution
+    x_p = (num / denom) * np.cos(w * t - np.arctan2(2 * z * wn * w, wn**2 - w**2))
+    
+    # Total solution
+    x = x_h + x_p
+
+    return t,x
+
+def getProblemSet(*args, **kwargs):
+    problemParams = getProblemParams(*args, **kwargs)
     problems = []
 
     for subProblemParams in problemParams:
@@ -27,11 +68,136 @@ def getProblemSet():
         
     return problems  
     
-def getGenericProblem(tStart, tStop, *args, generalSolutionOnly: bool = True, **kwargs):
+# Constructs problems for mass-spring-dashpot systems, optionally with a cosine
+# forcing term.   
+def getGenericProblem(
+        tStart,
+        tStop,
+        *args,
+        homogenousSolutionOnly: bool = True,
+        constructAnalyticalSolution: bool = False,
+        **kwargs
+        ):
+    
     def p(ax = None, showPlot = False):
-        model = lodecci.MSDp_SinusoidalForcing_IVP_Model(*args, **kwargs)
-        if generalSolutionOnly:
+        
+        analyticalSolutionSpecified = "analyticalSolution" in kwargs
+        
+        model = lodecci.MSDp_cosineForcing_IVP_Model(*args, **kwargs)
+        if homogenousSolutionOnly:
             model = model.getHomogenousModel()
+        
+        if not analyticalSolutionSpecified and constructAnalyticalSolution:
+            # Construct the analytical solution (if possible)
+            
+            niErr = lambda reason: NotImplemented(
+                "The analytical solution cannot be automatically constructed "
+                + "as the following is not supported: " + reason
+            )
+            
+            k, c, m = model.coeffs
+            x_0, v_0 = model.ic
+            F_0, omega = (
+                [model.F_0, model.omega] if not homogenousSolutionOnly 
+                else [None] * 2
+            )
+            
+            if model.t0 != np.float64(0):
+                raise niErr("Initial conditions not at t=0 (ie. t0 != 0)")
+            
+            omega_n = np.sqrt(k / m)
+            c_c = 2 * np.sqrt(k * m)
+            zeta = c / c_c
+            omega_d = omega_n * np.sqrt(1 - np.power(zeta, 2))          
+            
+            atResonance = omega == omega_n
+            
+            # For clarity, xp_0 is used instead of X_0 
+            if zeta == 0:
+                # Undamped case (c = 0)
+                if homogenousSolutionOnly:
+                    A = x_0
+                    B = v_0 / omega_n
+                    x_g = lambda t: (
+                        A * np.cos(omega_n * t)
+                        + B * np.sin(omega_n * t)
+                    )
+                elif atResonance:
+                    xp_0 = (F_0 * omega_n) / (2 * k)
+                    phi = np.pi / 2
+                    A = x_0
+                    B = v_0 / omega_n
+                    x_g = lambda t: (
+                        A * np.cos(omega_n * t)
+                        + B * np.sin(omega_n * t)
+                        + xp_0 * t * np.sin(omega_n * t)
+                    )
+                else:
+                    xp_0 = F_0 / (k - m * np.power(omega, 2))
+                    phi = np.float64(0)
+                    A = x_0 - xp_0
+                    B = v_0 / omega_n
+                    x_g = lambda t: (
+                        A * np.cos(omega_n * t)
+                        + B * np.sin(omega_n * t)
+                        + xp_0 * np.cos(omega * t)
+                    )
+            elif zeta < 1 and zeta > 0:
+                # Underdamped case
+                if homogenousSolutionOnly:
+                    A = x_0
+                    B = (v_0 + zeta * omega_n * x_0) / omega_d
+                    x_g = lambda t : (
+                        np.exp(-zeta * omega_n * t) * (
+                            A * np.cos(omega_d * t) + B * np.sin(omega_d * t)
+                        )
+                    )
+                elif atResonance:
+                    xp_0 = F_0 / (c * omega_n)
+                    phi = np.pi / 2
+                    A = x_0
+                    B = (v_0 + zeta * omega_n * x_0 - F_0 / c) / omega_d
+                    x_g = lambda t : (
+                        np.exp(-zeta * omega_n * t) * (
+                            A * np.cos(omega_d * t) + B * np.sin(omega_d * t)
+                        )
+                        + xp_0 * np.sin(omega_n * t)
+                    )
+                else:
+                    xp_0 = F_0 / np.sqrt(
+                        np.power((k - m * np.power(omega, 2)), 2)
+                        + np.power((c * omega), 2)
+                    )
+                    phi = np.arctan((c * omega) / (k - m * np.power(omega, 2)))
+                    A = x_0 - xp_0 * np.cos(phi)
+                    B = (
+                        (
+                            v_0
+                            + zeta * omega_n * (x_0 - xp_0 * np.cos(phi))
+                            - xp_0 * omega * np.sin(phi)
+                        )
+                        / omega_d
+                    )
+                    x_g = lambda t : (
+                        np.exp(-zeta * omega_n * t) * (
+                            A * np.cos(omega_d * t) + B * np.sin(omega_d * t)
+                        )
+                        + xp_0 * np.cos(omega * t - phi)
+                    )
+            elif zeta == 1:
+                # Critically damped case
+                raise niErr("Critically damped systems")
+            elif zeta > 1:
+                # Overdamped case
+                raise niErr("Overdamped systems")
+            else:
+                raise niErr(
+                    "Zeta < 0 (This should not be possible for physical "
+                    + "systems, check model parameters)"
+                )
+            
+            model.analyticalSolution = x_g
+            analyticalSolutionSpecified = True
             
         x, t, axOut, x_analytical = model.quickPlot(
             tStop,
@@ -39,7 +205,7 @@ def getGenericProblem(tStart, tStop, *args, generalSolutionOnly: bool = True, **
             zerothOrderOnly = True,
             ax = ax,
             showPlot = showPlot,
-            plotAnalyticalSolution = "analyticalSolution" in kwargs
+            plotAnalyticalSolution = analyticalSolutionSpecified
         )
         
         return model, x, t, axOut, x_analytical
@@ -52,7 +218,8 @@ def packageProblems(problems):
             _, axs = plt.subplots(
                 ncols = len(problems), 
                 squeeze = False, 
-                sharey = True
+                sharey = True,
+                layout = "constrained"
             )
     
         out = []
@@ -64,13 +231,20 @@ def packageProblems(problems):
     
     return p
 
-def getProblemParams():
-    return [
+# Problem parameters for mass-spring-dashpot systems, optionally with a cosine
+# forcing term.   
+def getProblemParams(
+        homogenousSolutionOnly : None | bool = None,
+        constructAnalyticalSolution : None | bool = None
+        ):
+    
+    problemParams = [
         [ # Problem 1
             [
-                [0.0, 10.0, 1.0, 0.5, 100.0, 1.0, 7.0, 0.1,],
+                [0.0, 3.0, 1.0, 0.5, 100.0, 1.0, 7.0, 0.1,],
                 {
-                    "generalSolutionOnly" : False,
+                    "homogenousSolutionOnly" : False,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [0.0, 0.0],
                 }
@@ -78,9 +252,10 @@ def getProblemParams():
         ],
         [ # Problem 2
             [
-                [0.0, 10.0, 2.0, 0.8, 150.0, 2.0, 5.0, 0.05],
+                [0.0, 3.0, 2.0, 0.8, 150.0, 2.0, 5.0, 0.05],
                 {
-                    "generalSolutionOnly" : False,
+                    "homogenousSolutionOnly" : False,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [0.0, 0.0]
                 }
@@ -88,9 +263,10 @@ def getProblemParams():
         ],
         [ # Problem 3
             [
-                [0.0, 10.0, 1.5, 0.4, 200.0, 1.5, 10.0, 0.01],
+                [0.0, 3.0, 1.5, 0.4, 200.0, 1.5, 10.0, 0.01],
                 {
-                    "generalSolutionOnly" : False,
+                    "homogenousSolutionOnly" : False,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [0.0, 0.0]
                 }
@@ -100,7 +276,8 @@ def getProblemParams():
             [
                 [0.0, 10.0, 1.0, 0.0, 1.0, 0.0, 0.0, dt],
                 {
-                    "generalSolutionOnly" : True,
+                    "homogenousSolutionOnly" : True,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [1.0, 1.0]
                 }
@@ -110,7 +287,8 @@ def getProblemParams():
             [
                 [0.0, 25.0, 1.0, 0.125, 1.0, 0.0, 0.0, dt],
                 {
-                    "generalSolutionOnly" : True,
+                    "homogenousSolutionOnly" : True,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [2.0, 0.0]
                 }
@@ -120,7 +298,8 @@ def getProblemParams():
             [
                 [0.0, 70.0, 1.0, 0.125, 1.0, 3.0, 1.0, dt],
                 {
-                    "generalSolutionOnly" : False,
+                    "homogenousSolutionOnly" : False,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [2.0, 0.0]
                 }
@@ -130,13 +309,26 @@ def getProblemParams():
             [
                 [0.0, 100.0, 1.0, 0.0, 1.0, 0.5, 0.8, dt],
                 {
-                    "generalSolutionOnly" : False,
+                    "homogenousSolutionOnly" : False,
+                    "constructAnalyticalSolution" : True,
                     "t0" : 0.0,
                     "ic" : [1.0, 0.0]
                 }
             ] for dt in [0.1, 0.05, 0.01]
         ]
     ]
+    
+    kwargs = {
+        "homogenousSolutionOnly" : homogenousSolutionOnly,
+        "constructAnalyticalSolution" : constructAnalyticalSolution
+    }
+    for subProblemParams in problemParams:
+        for p in subProblemParams:
+            for k, v in kwargs.items():
+                if v is not None:
+                    p[1][k] = v
+
+    return problemParams
     
 if __name__ == "__main__":
     main()
